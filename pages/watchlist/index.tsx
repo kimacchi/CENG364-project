@@ -1,142 +1,55 @@
-import { useState, useEffect } from "react";
-import Head from "next/head";
+import React, { useContext, useEffect, useState } from "react";
 import axios, { AxiosResponse } from "axios";
-import { TopRatedMovies } from "../types/movie";
-import { useContext } from "react";
-import { AppContext } from "./_app";
+import { AppContext } from "../_app";
+import { User } from "../../types/app_context";
+import { TopRatedMovies } from "../../types/movie";
 import { useRouter } from "next/router";
-
-import { Input } from "@nextui-org/react";
 import { v4 as uuidv4 } from "uuid";
-import { User } from "../types/app_context";
 import Link from "next/link";
+import { Input } from "@nextui-org/react";
 
-export default function Home() {
-  const [query, setQuery] = useState<string>("");
+const Home = () => {
   const router = useRouter();
-  useEffect(() => {
-    const {query} = router.query;
-    setQuery(query as string)
-  }, [router])
 
-  
-  
-  const [search, setSearch] = useState<string>("");
-
-
-  const [movies, setMovies] = useState<Array<TopRatedMovies>>([]);
-
-
-
-  const [movieIds, setMovieIds] = useState<number[]>([]);
   const { user, setUser } = useContext(AppContext);
 
-  console.log(user);
-
   const [watchlist, setWatchlist] = useState<number[]>([]);
-
+  const [movies, setMovies] = useState<TopRatedMovies[]>([]);
   useEffect(() => {
+    console.log(user);
     if (user) {
       const getUser = async () => {
         const res = await axios.get<any, AxiosResponse<User>>(
           `/api/users/${user.id}`
         );
+
         setWatchlist(res.data.watchlist.map((e) => parseInt(e)) || []);
       };
       getUser();
     }
   }, [user]);
 
-  const [page, setPage] = useState<number>(1);
-
-  // useEffect(() => {
-  //   setMovies((e) => {
-  //     return
-  //   })
-  // }, [movies])
-
   useEffect(() => {
-    const fetchData = async () => {
-      interface TopRatedMoviesResponse {
-        page: number;
-        results: TopRatedMovies[];
-        total_pages: number;
-        total_results: number;
-      }
-      const result = await axios.get<
-        any,
-        AxiosResponse<TopRatedMoviesResponse, any>
-      >(
-        `${!query ? "https://api.themoviedb.org/3/trending/movie/day?language=en-US&page=" + page : "https://api.themoviedb.org/3/search/movie?query=" + query + "&include_adult=true&language=en-US&page=" + page}`,
-        {
-          headers: {
-            Accept: "application/json",
-            Authorization: "Bearer " + process.env.NEXT_PUBLIC_API_KEY,
-          },
-        }
+    const getMovies = async () => {
+      console.log(watchlist);
+      const res = await axios.post<any, AxiosResponse<TopRatedMovies[]>>(
+        `/api/users/watchlist`,
+        { watchlist }
       );
-
-      setMovies((e) => [...result.data.results]);
-      result.data.results.map(async (movie) => {
-        const res = await axios.post("/api/movies", movie);
-      });
+      console.log(res.data);
+      setMovies(res.data);
     };
-    fetchData();
-  }, [query])
-
-  useEffect(() => {
-    const fetchData = async () => {
-      interface TopRatedMoviesResponse {
-        page: number;
-        results: TopRatedMovies[];
-        total_pages: number;
-        total_results: number;
-      }
-      const result = await axios.get<
-        any,
-        AxiosResponse<TopRatedMoviesResponse, any>
-      >(
-        `${!query ? "https://api.themoviedb.org/3/trending/movie/day?language=en-US&page=" + page : "https://api.themoviedb.org/3/search/movie?query=" + encodeURIComponent(query) + "&include_adult=true&language=en-US&page=" + page}`,
-        {
-          headers: {
-            Accept: "application/json",
-            Authorization: "Bearer " + process.env.NEXT_PUBLIC_API_KEY,
-          },
-        }
-      );
-
-      setMovies((e) => [...e, ...result.data.results]);
-      result.data.results.map(async (movie) => {
-        const res = await axios.post("/api/movies", movie);
-      });
-    };
-    fetchData();
-  }, [page]);
-
-
-  useEffect(() => {
-    setMovieIds(
-      movies.map((e) => {
-        return e.id;
-      })
-    );
-    movies.map(async (movie) => {
-      const res = await axios.post("/api/movies", movie);
-      console.log(res)
-    });
-    console.log(movies)
-  }, [movies]);
+    getMovies();
+  }, [watchlist]);
 
   const includesMovie = (id: number) => {
     return watchlist.includes(id);
   };
 
+
+  const [search, setSearch] = useState<string>("");
   return (
     <div className="bg-zinc-800 w-full min-h-screen text-white pb-8 flex flex-col items-center dark">
-      <Head>
-        <title>postgres.js + next.js</title>
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
       <div className="flex items-center w-full bg-zinc-800/70 backdrop-blur-md h-24 fixed z-[1000000] px-16 justify-between">
         <a href="#" className="text-3xl">
           MyMovieList
@@ -151,22 +64,18 @@ export default function Home() {
           onValueChange={(e) => setSearch(e)}
           onKeyDown={(e) => {
             if(e.code === "Enter"){
-              setPage(1)
               router.push({
                 pathname: "/",
                 query: { query:  search},
               });
-              setSearch("")
             }
           }}
           endContent={
             <button className="h-full flex items-center justify-center" onClick={() => {
-              setPage(1)
               router.push({
                 pathname: "/",
                 query: { query: search},
               });
-              setSearch("")
             }}>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -202,13 +111,7 @@ export default function Home() {
           )}
         </Link>
       </div>
-      {
-        query ? (
-          <h1 className="text-3xl mt-24">Search results for "{query}"</h1>
-        ) : (
-          <h1 className="text-3xl mt-24">Trending Movies</h1>
-        )
-      }
+      <h1 className="text-3xl mt-24">Your Watchlist</h1>
       <div className="flex flex-wrap justify-center gap-6 mt-24">
         {movies.map((movie: TopRatedMovies) => {
           return (
@@ -299,12 +202,8 @@ export default function Home() {
           );
         })}
       </div>
-      <button
-        onClick={() => setPage((e) => e + 1)}
-        className="mt-16 bg-gradient-to-t from-[#370b2e] to-[#651777] py-2 px-8 font-mono text-2xl active:scale-95  rounded-md hover:rounded-full transition-all tracking-widest"
-      >
-        LOAD MORE
-      </button>
     </div>
   );
-}
+};
+
+export default Home;
